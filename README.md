@@ -2,7 +2,7 @@
 
 Clone tĩnh y hệt của https://sotaydientuhuongdantthc.hanoi.gov.vn/
 ("Sổ tay điện tử – Hướng dẫn hỗ trợ người dân & doanh nghiệp thực hiện TTHC",
-Trung tâm Phục vụ Hành chính công TP. Hà Nội).
+Sổ tay dịch vụ công.
 
 > Bản chất site gốc: một **flipbook (sách lật)** export từ **FlipHTML5** — convert PDF → sách lật web.
 > Toàn bộ là file tĩnh, **không backend/DB**. Bản mirror này tự chứa hoàn toàn, không gọi ngược về server gốc.
