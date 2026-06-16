@@ -39,4 +39,19 @@
     });
   } catch (e) {}
   if (_fp) _fp = clampPages(_fp);
+
+  // 3) Ép BookInfo.getPageCount() <= LIMIT. Hàm này đọc bookConfig.totalPageCount (=66,
+  //    giá trị gốc trong blob mã hoá — KHÔNG sửa được data vì engine có _VerifyBookConfig
+  //    integrity check, đụng vào là vỡ build). Nên override chính METHOD (an toàn) để các
+  //    chỗ engine dùng getPageCount thấy đúng N -> nhất quán (thumbnail, logic biên trang).
+  (function patchGetPageCount(c) {
+    if (window.BookInfo && typeof BookInfo.getPageCount === 'function' && !BookInfo.getPageCount.__clamped) {
+      var orig = BookInfo.getPageCount.bind(BookInfo);
+      var wrapped = function () { var r = orig(); return (typeof r === 'number' && r > LIMIT) ? LIMIT : r; };
+      wrapped.__clamped = true;
+      try { BookInfo.getPageCount = wrapped; } catch (e) {}
+      return;
+    }
+    if (c < 400) setTimeout(function () { patchGetPageCount(c + 1); }, 40);
+  })(0);
 })();
