@@ -8,9 +8,15 @@ PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8777
 class RangeHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Accept-Ranges", "bytes")
+        # Tắt cache trình duyệt khi dev — sửa file là thấy ngay sau khi reload
+        self.send_header("Cache-Control", "no-store, must-revalidate")
         super().end_headers()
 
     def send_head(self):
+        # Bỏ header điều kiện -> super() không bao giờ trả 304, luôn gửi bản mới nhất
+        for h in ("If-Modified-Since", "If-None-Match"):
+            if h in self.headers:
+                del self.headers[h]
         rng = self.headers.get("Range")
         if not rng:
             return super().send_head()
@@ -52,6 +58,9 @@ class _Limited:
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    httpd = http.server.HTTPServer(("", PORT), RangeHandler)
-    print(f"Serving (with Range support) at http://localhost:{PORT}")
+    # ThreadingHTTPServer: xử lý nhiều kết nối song song. Bắt buộc — vì video
+    # stream giữ kết nối mở lâu, server 1 luồng sẽ nghẽn cứng cả trang.
+    httpd = http.server.ThreadingHTTPServer(("", PORT), RangeHandler)
+    httpd.daemon_threads = True
+    print(f"Serving (Range + threaded) at http://localhost:{PORT}")
     httpd.serve_forever()

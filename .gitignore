@@ -5,3 +5,7 @@ files/editor/files/extfile/*.mp4
 # macOS / editor cruft
 .DS_Store
 *.log
+*.bak
+
+# Bản backup ảnh/video gốc (không commit, chỉ giữ local)
+_backup/
