@@ -69,32 +69,6 @@
 	
   <noscript><div><hr/><ul><li><a href="files/basic-html/page1.html">Pages</a></li></ul><hr style="width:80%"/></div></noscript>
 
-  <!-- DEBUG bắt lỗi crash — XOÁ sau khi xong -->
-  <script>
-  (function () {
-    var box, n = 0;
-    function show(html) {
-      n++;
-      if (!box) {
-        box = document.createElement('div');
-        box.style.cssText = 'position:fixed;left:0;right:0;bottom:0;max-height:45%;overflow:auto;z-index:2147483647;background:#7a0000;color:#fff;font:12px/1.5 monospace;padding:10px;white-space:pre-wrap;border-top:3px solid #ff0';
-        document.body.appendChild(box);
-      }
-      box.innerHTML += '<div style="border-bottom:1px solid #ff6;padding:4px 0">#' + n + ' ' + html + '</div>';
-    }
-    window.addEventListener('error', function (e) {
-      var m = (e.error && e.error.stack) ? e.error.stack : (e.message + ' @ ' + e.filename + ':' + e.lineno + ':' + e.colno);
-      console.error('[CRASH]', m);
-      show(String(m).replace(/</g, '&lt;'));
-    });
-    window.addEventListener('unhandledrejection', function (e) {
-      var m = e.reason && e.reason.stack ? e.reason.stack : String(e.reason);
-      console.error('[REJECT]', m);
-      show('PROMISE: ' + String(m).replace(/</g, '&lt;'));
-    });
-  })();
-  </script>
-
 </body>
 
 </html>

@@ -63,6 +63,7 @@ jobs:
             --exclude='download-videos.sh' \
             --exclude='.gitignore' \
             --exclude='README.md' \
+            --exclude='tests' \
             --exclude='files/editor/files/extfile/' \
             -e "ssh -i ~/.ssh/id_deploy" \
             ./ "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_DIR}/site/"

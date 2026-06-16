@@ -9,3 +9,6 @@ files/editor/files/extfile/*.mp4
 
 # Bản backup ảnh/video gốc (không commit, chỉ giữ local)
 _backup/
+
+# Cấu hình preview/dev của Claude Code (chỉ local)
+.claude/

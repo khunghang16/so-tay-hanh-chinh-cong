@@ -1,14 +1,28 @@
-/* Giới hạn flipbook chỉ hiển thị N trang đầu (tới hết mục "Có con nhỏ").
+/* Giới hạn flipbook ở LIMIT trang: 11 trang nội dung + 1 BÌA SAU (page 12) = 12.
  *
- * Engine FlipHTML5 lấy số trang từ `bookConfig.totalPageCount` (giải mã từ blob
- * trong config.js) -> gán vào 2 biến global `originTotalPageCount` / `totalPageCount`,
- * và dựng ảnh từ mảng `fliphtml5_pages`. Script này KẸP các biến global đó về LIMIT
- * NGAY KHI engine gán (Object.defineProperty cài sẵn trước khi engine chạy).
- * KHÔNG đụng vào `window.bookConfig` vì engine có lúc gán null/ dựng lại -> vỡ.
- * Phải nạp NGAY SAU config.js và TRƯỚC engine (xem index.html).
+ * Engine FlipHTML5 đọc số trang gốc từ bookConfig.totalPageCount=66 (giải mã từ blob
+ * mã hoá trong config.js) -> originTotalPageCount/totalPageCount, và dựng ảnh từ mảng
+ * fliphtml5_pages. Shim này KẸP mọi thứ về LIMIT=12 NGAY KHI engine gán
+ * (Object.defineProperty cài trước khi engine chạy). KHÔNG đụng window.bookConfig
+ * (engine có lúc gán null/dựng lại -> vỡ) và KHÔNG sửa bookConfig.totalPageCount (có
+ * _VerifyBookConfig integrity check -> vỡ build). Nạp NGAY SAU config.js, TRƯỚC engine.
+ *
+ * 4 việc, để vừa fix "sai page 10" vừa cho page 12 là BÌA SAU ĐƠN như bản gốc:
+ *  1) totalPageCount / originTotalPageCount = 12: để [10-11] là spread GIỮA -> page 10
+ *     render đúng. (Bug "sai page 10": engine làm hỏng nửa TRÁI của spread CUỐI khi
+ *     back rồi next; biến [10-11] thành spread giữa là hết. Để 11 thì bug quay lại.)
+ *  2) fliphtml5_pages cắt còn 12 ảnh trang (+ thumbnail).
+ *  3) getPageCount() -> 12: đồng bộ các check "trang cuối" (UI / biên) về 12.
+ *  4) getPagesByIndex() LỌC bỏ trang > 12: mấu chốt để page 12 thành TRANG ĐƠN. Hàm
+ *     gốc ghép cặp bằng `f <= bookConfig.totalPageCount` (=66) nên page 12 ra [12,13]
+ *     (vì 13<=66) -> getCurrentPageWidthHeight đọc pageInfoArray[13]=undefined ->
+ *     'Cannot read properties of undefined (reading pageWidth)' khi hover. Lọc >12 ->
+ *     [12,13] thành [12] -> getCurrentPages=[12] -> render ĐƠN, căn giữa (isCoverPage(12)
+ *     =true vì totalPageCount global=12) -> hết lỗi, đúng như bản gốc (page 66 đơn).
+ * (Đã verify 2026-06.)
  */
 (function () {
-  var LIMIT = 11;
+  var LIMIT = 12;   // 11 trang nội dung + 1 BÌA SAU (page 12). Xem chú thích đầu file.
 
   function clampPages(arr) {
     return Array.isArray(arr) && arr.length > LIMIT ? arr.slice(0, LIMIT) : arr;
@@ -40,10 +54,7 @@
   } catch (e) {}
   if (_fp) _fp = clampPages(_fp);
 
-  // 3) Ép BookInfo.getPageCount() <= LIMIT. Hàm này đọc bookConfig.totalPageCount (=66,
-  //    giá trị gốc trong blob mã hoá — KHÔNG sửa được data vì engine có _VerifyBookConfig
-  //    integrity check, đụng vào là vỡ build). Nên override chính METHOD (an toàn) để các
-  //    chỗ engine dùng getPageCount thấy đúng N -> nhất quán (thumbnail, logic biên trang).
+  // 3) Override BookInfo.getPageCount() -> LIMIT (đồng bộ check "trang cuối" UI/biên)
   (function patchGetPageCount(c) {
     if (window.BookInfo && typeof BookInfo.getPageCount === 'function' && !BookInfo.getPageCount.__clamped) {
       var orig = BookInfo.getPageCount.bind(BookInfo);
@@ -53,5 +64,21 @@
       return;
     }
     if (c < 400) setTimeout(function () { patchGetPageCount(c + 1); }, 40);
+  })(0);
+
+  // 4) Override BookInfo.getPagesByIndex() -> LỌC trang > LIMIT khỏi cặp => page 12 ĐƠN
+  //    (xem mục 4 ở chú thích đầu file). Page 1-11 không đổi (cặp đều <=12).
+  (function patchGetPagesByIndex(c) {
+    if (window.BookInfo && typeof BookInfo.getPagesByIndex === 'function' && !BookInfo.getPagesByIndex.__clamped) {
+      var orig = BookInfo.getPagesByIndex.bind(BookInfo);
+      var wrapped = function (b) {
+        var r = orig(b);
+        return Array.isArray(r) ? r.filter(function (p) { return p <= LIMIT; }) : r;
+      };
+      wrapped.__clamped = true;
+      try { BookInfo.getPagesByIndex = wrapped; } catch (e) {}
+      return;
+    }
+    if (c < 400) setTimeout(function () { patchGetPagesByIndex(c + 1); }, 40);
   })(0);
 })();
