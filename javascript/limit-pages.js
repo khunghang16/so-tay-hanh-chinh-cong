@@ -24,8 +24,24 @@
 (function () {
   var LIMIT = 12;   // 11 trang nội dung + 1 BÌA SAU (page 12). Xem chú thích đầu file.
 
+  // Cache-buster cho ẢNH trang/thumb. URL ảnh gốc dùng version CỐ ĐỊNH (engine nối
+  // "?<bookConfig.CreatedTime>") nên trình duyệt giữ ảnh cũ rất lâu (trước đây nginx
+  // còn để cache 30 ngày) -> hard-reload không ăn vì ảnh do JS nạp động. Ta gắn thêm
+  // "?v=ASSET_VER" vào path; engine sẽ nối tiếp bằng "&CreatedTime" (book.min.js:424
+  // dùng "&" khi đã có "?") -> đổi ASSET_VER là đổi URL -> trình duyệt tải ảnh mới.
+  // Kết hợp nginx "no-cache" cho ảnh (luôn revalidate) thì lần sau đổi ảnh KHÔNG cần
+  // bump nữa — chỉ bump nếu muốn ép tải lại ngay với client còn kẹt cache cũ.
+  var ASSET_VER = '20260616';
+  function bustUrl(u) {
+    return (typeof u === 'string' && /files\/(page|thumb)\//.test(u) && u.indexOf('?v=') < 0)
+      ? u + '?v=' + ASSET_VER : u;
+  }
+
   function clampPages(arr) {
-    return Array.isArray(arr) && arr.length > LIMIT ? arr.slice(0, LIMIT) : arr;
+    if (!Array.isArray(arr)) return arr;
+    var out = arr.length > LIMIT ? arr.slice(0, LIMIT) : arr;
+    out.forEach(function (it) { if (it) { it.l = bustUrl(it.l); it.t = bustUrl(it.t); } });
+    return out;
   }
 
   // 1) Kẹp 2 biến đếm trang khi engine gán
