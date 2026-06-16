@@ -1,0 +1,46 @@
+# =============================================================================
+# Docker Compose — Sổ tay điện tử HCC (static flipbook)
+# Co-hosted on the shared GCP VM `wintrade` (project wintrade-498209).
+# Shared Traefik + Let's Encrypt provided by /opt/deploy/infra/docker-compose.yml
+#
+# This is a PURE STATIC site: a single nginx:alpine container serving the files
+# rsync'd by CI into ./site (bind-mounted read-only). No build, no DB.
+# Videos (~1.7GB, handled by another member) live under
+# ./site/files/editor/files/extfile and are NOT touched by the deploy CI.
+#
+# Usage on the VM (CI does this automatically):
+#   cd /opt/apps/sotay-hcc
+#   docker compose up -d
+# =============================================================================
+networks:
+  demo-net:
+    external: true
+
+services:
+  web:
+    image: nginx:alpine
+    container_name: sotay-hcc-web
+    restart: unless-stopped
+    expose:
+      - "80"
+    volumes:
+      - ./site:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - demo-net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=demo-net"
+      - "traefik.http.routers.sotay-hcc.rule=Host(`${DOMAIN}`)"
+      - "traefik.http.routers.sotay-hcc.entrypoints=websecure"
+      - "traefik.http.routers.sotay-hcc.tls=true"
+      # Gotcha 2 (per-router certresolver REQUIRED): `tls=true` alone makes an
+      # empty TLS config that does NOT inherit the entrypoint resolver → ACME
+      # never runs → Traefik default cert served. Must be explicit.
+      - "traefik.http.routers.sotay-hcc.tls.certresolver=letsencrypt"
+      - "traefik.http.services.sotay-hcc.loadbalancer.server.port=80"
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+          cpus: "0.5"

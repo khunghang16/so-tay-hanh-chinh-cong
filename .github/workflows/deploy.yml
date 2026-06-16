@@ -1,0 +1,85 @@
+name: Deploy (static → wintrade VM)
+
+# Auto-deploy the static flipbook to the shared GCP VM `wintrade` on every push
+# to main. Pure rsync of static files + an nginx:alpine container behind the
+# shared Traefik (Let's Encrypt). No build, no GHCR, no DB.
+#
+# Required GitHub secrets:
+#   GCP_HOST     35.198.246.101         (wintrade VM static IP)
+#   GCP_USER     deploy                 (CI deploy user, owns /opt/apps/*)
+#   GCP_SSH_KEY  <private key>          (~/.ssh/wintrade_deploy contents)
+#
+# Domain is nip.io (no DNS needed): sotay.35-198-246-101.nip.io
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-sotay-hcc
+  cancel-in-progress: true
+
+env:
+  REMOTE_DIR: /opt/apps/sotay-hcc
+  DOMAIN: sotay.35-198-246-101.nip.io
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.GCP_SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "${{ secrets.GCP_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Ensure remote dirs (preserve video dir)
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}" \
+            "mkdir -p ${REMOTE_DIR}/site/files/editor/files/extfile"
+
+      - name: Write compose .env
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}" \
+            "printf 'DOMAIN=%s\n' '${DOMAIN}' > ${REMOTE_DIR}/.env"
+
+      - name: Rsync deploy config (compose + nginx.conf)
+        run: |
+          rsync -az -e "ssh -i ~/.ssh/id_deploy" \
+            deploy/docker-compose.yml deploy/nginx.conf \
+            "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_DIR}/"
+
+      - name: Rsync static site (exclude dev files; never delete videos)
+        run: |
+          rsync -az --delete \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='deploy' \
+            --exclude='serve.py' \
+            --exclude='download-videos.sh' \
+            --exclude='.gitignore' \
+            --exclude='README.md' \
+            --exclude='files/editor/files/extfile/' \
+            -e "ssh -i ~/.ssh/id_deploy" \
+            ./ "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_DIR}/site/"
+
+      - name: Bring up / reload nginx
+        run: |
+          ssh -i ~/.ssh/id_deploy "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}" \
+            "cd ${REMOTE_DIR} && docker compose up -d && docker compose exec -T web nginx -s reload || true"
+
+      - name: Health check
+        run: |
+          echo "Waiting for https://${DOMAIN} ..."
+          for i in $(seq 1 10); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "https://${DOMAIN}/" || true)
+            echo "  attempt $i → HTTP $code"
+            if [ "$code" = "200" ]; then echo "OK"; exit 0; fi
+            sleep 6
+          done
+          echo "Health check did not return 200 (cert may still be issuing on first deploy)."
+          exit 1
