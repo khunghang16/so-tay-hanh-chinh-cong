@@ -67,10 +67,10 @@ jobs:
             -e "ssh -i ~/.ssh/id_deploy" \
             ./ "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}:${REMOTE_DIR}/site/"
 
-      - name: Bring up / reload nginx
+      - name: Bring up nginx (force-recreate để chắc chắn nạp nginx.conf mới)
         run: |
           ssh -i ~/.ssh/id_deploy "${{ secrets.GCP_USER }}@${{ secrets.GCP_HOST }}" \
-            "cd ${REMOTE_DIR} && docker compose up -d && docker compose exec -T web nginx -s reload || true"
+            "cd ${REMOTE_DIR} && docker compose up -d --force-recreate web"
 
       - name: Health check
         run: |
