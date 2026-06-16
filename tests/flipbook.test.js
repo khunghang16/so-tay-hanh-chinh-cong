@@ -123,7 +123,7 @@
       // I) Hotspot điều hướng (page-links)
       return goto(2);
     }).then(function () {
-      return wait(300); // chờ overlay render (poll 200ms)
+      return wait(700); // chờ overlay render (poll 200ms + ảnh trang vào vị trí)
     }).then(function () {
       var ov = document.getElementById('__pagelinks');
       var n = ov ? ov.querySelectorAll('div').length : 0;
@@ -135,7 +135,7 @@
         eq('I3 click "Có con nhỏ" -> sang page 6 [6,7]', BookInfo.getCurrentPages(), [6, 7]);
       });
     }).then(function () {
-      return wait(300);
+      return wait(700);
     }).then(function () {
       var back = hotspotByTitle('Quay lại Mục lục');
       ok('I4 trang nội dung có hotspot "Quay lại Mục lục"', !!back);
