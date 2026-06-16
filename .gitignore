@@ -1,0 +1,7 @@
+# Video lớn (~1.7GB, mỗi file tới 302MB) — GitHub chặn file >100MB.
+# Tải lại bằng: bash download-videos.sh
+files/editor/files/extfile/*.mp4
+
+# macOS / editor cruft
+.DS_Store
+*.log
